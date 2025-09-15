@@ -6,60 +6,12 @@ from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
 
 
-browser = webdriver.Firefox()
-browser.get("https://ru.wikipedia.org/wiki/Заглавная_страница")
-
-def user_search_input() -> list:
-    """Функция для поиска всех вариантов статей по поисковому запросу пользователя"""
-    search_box = browser.find_element(By.ID, "searchInput")
-
-    search_box.send_keys(input("Введите текст поискового запроса в Википедии: "))
-    search_box.send_keys(Keys.RETURN)
-
-    # Ожидаем загрузку страницы
-    new_url = cur_url = browser.current_url
-    while cur_url == new_url:
-        new_url = browser.current_url
-
-    time.sleep(5)
-
-    articles = []
-    search_results = browser.find_elements(By.TAG_NAME, "li")
-    for elem in search_results:
-        class_elem = elem.get_attribute("class")
-        if class_elem == "mw-search-result mw-search-result-ns-0 searchresult-with-quickview":
-            articles.append(elem)
-
-    print(len(articles))
-    return articles
-
-
-def choosing_article(articles):
-    """Функция для вывода превью или параграфов статей по очереди и выбор статьи пользователем"""
-    if not articles:
-        return None
-
-    while True:
-        for article in articles:
-            print(article.text + "\n----------------------------")
-            print("Чтобы листать дальше, введите 'n'\n"
-                  "Для выбора этой статьи введите 'enter'\n"
-                  "Для выхода из программы введите 'q'")
-            user_input = input()
-            if user_input == "n":
-                continue
-            elif user_input == "q":
-                browser.quit()
-                return None
-            else:
-                link = article.find_element(By.TAG_NAME, "a").get_attribute("href")
-                return link
-
-
 def get_paragraphs(link):
-    """Функция для поиска параграфов и связных статей в статье"""
+    """Функция для перехода по ссылке, запись абзацев и ссылок на связанные статьи"""
     if link is None:
         print("Ссылка не найдена")
+        return None
+    elif link == "end":
         return None
     else:
         browser.get(link)
@@ -77,11 +29,30 @@ def get_paragraphs(link):
             dict_main_articles[cnt] = [title, link]
             cnt += 1
 
+    return {"paragraphs": paragraphs,
+            "main_articles": dict_main_articles}
+
+
+def print_texts(text_dict):
+    """Функция для вывода абзацев в консоль и взаимодействия с пользователем"""
+
+    if not text_dict:
+        print("Статья закончилась. Завершение программы")
+        browser.quit()
+        sys.exit()
+
+    paragraphs = text_dict.get("paragraphs")
+    dict_main_articles = text_dict.get("main_articles")
+
+    if not paragraphs:
+        print("Не удалось получить текст стати")
+        return None
+
     for paragraph in paragraphs:
         print(paragraph.text + "\n----------------------------")
         print("Чтобы читать дальше, нажмите 'enter'")
         print("Чтобы посмотреть список связанных статей, введите 'm'")
-        print("Для выхода из программы введите 'q'")
+        print("Для выхода из программы введите 'q'\n----------------------------")
 
         user_input = input()
         if user_input == "q":
@@ -90,7 +61,7 @@ def get_paragraphs(link):
         elif user_input == "m":
             if dict_main_articles:
                 cnt = 1
-                for el in range(len(dict_main_articles)):
+                for _ in range(len(dict_main_articles)):
                     print(f"{cnt}. {dict_main_articles[cnt][0]}")
                     cnt += 1
 
@@ -100,7 +71,8 @@ def get_paragraphs(link):
                     continue
                 else:
                     try:
-                        get_paragraphs(dict_main_articles[int(user_input)][1])
+                        link = dict_main_articles[int(user_input)][1]
+                        return link
                     except:
                         print("Что-то пошло не так! Вернулись к статье\n")
                         continue
@@ -109,24 +81,63 @@ def get_paragraphs(link):
                 continue
         else:
             continue
-    return None
+
+    return "end"
 
 
-def main_func():
-    articles = user_search_input()
-    link = choosing_article(articles)
-    get_paragraphs(link)
+browser = webdriver.Firefox()
+browser.get("https://ru.wikipedia.org/wiki/Заглавная_страница")
 
+search_box = browser.find_element(By.ID, "searchInput")
+search_box.send_keys(input("Введите текст поискового запроса в Википедии: "))
+search_box.send_keys(Keys.RETURN)
 
-main_func()
+# Ожидаем загрузку страницы
+new_url = cur_url = browser.current_url
+while cur_url == new_url:
+    new_url = browser.current_url
+
+time.sleep(3)
+
+# Поиск превью статей по запросу
+articles = []
+search_results = browser.find_elements(By.TAG_NAME, "li")
+for elem in search_results:
+    class_elem = elem.get_attribute("class")
+    if class_elem == "mw-search-result mw-search-result-ns-0 searchresult-with-quickview":
+        articles.append(elem)
+
+# Перебор статей и выбор одной
+if not articles:
+    print("Не удалось найти статьи по запросу")
+else:
+    run = True
+    while run:
+        for article in articles:
+            print(article.text + "\n----------------------------")
+            print("Чтобы листать дальше, введите 'n'\n"
+                  "Для выбора этой статьи введите 'enter'\n"
+                  "Для выхода из программы введите 'q'\n----------------------------")
+            user_input = input()
+            if user_input == "n":
+                continue
+            elif user_input == "q":
+                browser.quit()
+                sys.exit()
+            else:
+                link = article.find_element(By.TAG_NAME, "a").get_attribute("href")
+                run = False
+                break
+
 
 while True:
-    user_input = input("Хотите что-то снова найти? (да / нет): ")
-    if user_input == "да":
-        main_func()
-    elif user_input == "нет":
+    try:
+        content = get_paragraphs(link)
+        link = print_texts(content)
+    except SystemExit:
+        sys.exit()
+    except:
+        print("Что-то пошло не так и страница не обработалась")
+        browser.quit()
         break
-
-print("Программа завершена")
-
 

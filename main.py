@@ -84,52 +84,52 @@ def print_texts(text_dict):
 
     return "end"
 
+def start_search():
+    browser.get("https://ru.wikipedia.org/wiki/Заглавная_страница")
+
+    search_box = browser.find_element(By.ID, "searchInput")
+    search_box.send_keys(input("Введите текст поискового запроса в Википедии: "))
+    search_box.send_keys(Keys.RETURN)
+
+    # Ожидаем загрузку страницы
+    new_url = cur_url = browser.current_url
+    while cur_url == new_url:
+        new_url = browser.current_url
+
+    time.sleep(3)
+
+    # Поиск превью статей по запросу
+    articles = []
+    search_results = browser.find_elements(By.TAG_NAME, "li")
+    for elem in search_results:
+        class_elem = elem.get_attribute("class")
+        if class_elem == "mw-search-result mw-search-result-ns-0 searchresult-with-quickview":
+            articles.append(elem)
+
+    # Перебор статей и выбор одной
+    if not articles:
+        print("Не удалось найти статьи по запросу")
+        return "end"
+    else:
+        while True:
+            for article in articles:
+                print(article.text + "\n----------------------------")
+                print("Чтобы листать дальше, введите 'n'\n"
+                      "Для выбора этой статьи введите 'enter'\n"
+                      "Для выхода из программы введите 'q'\n----------------------------")
+                user_input = input()
+                if user_input == "n":
+                    continue
+                elif user_input == "q":
+                    browser.quit()
+                    sys.exit()
+                else:
+                    link = article.find_element(By.TAG_NAME, "a").get_attribute("href")
+                    return link
+
 
 browser = webdriver.Firefox()
-browser.get("https://ru.wikipedia.org/wiki/Заглавная_страница")
-
-search_box = browser.find_element(By.ID, "searchInput")
-search_box.send_keys(input("Введите текст поискового запроса в Википедии: "))
-search_box.send_keys(Keys.RETURN)
-
-# Ожидаем загрузку страницы
-new_url = cur_url = browser.current_url
-while cur_url == new_url:
-    new_url = browser.current_url
-
-time.sleep(3)
-
-# Поиск превью статей по запросу
-articles = []
-search_results = browser.find_elements(By.TAG_NAME, "li")
-for elem in search_results:
-    class_elem = elem.get_attribute("class")
-    if class_elem == "mw-search-result mw-search-result-ns-0 searchresult-with-quickview":
-        articles.append(elem)
-
-# Перебор статей и выбор одной
-if not articles:
-    print("Не удалось найти статьи по запросу")
-else:
-    run = True
-    while run:
-        for article in articles:
-            print(article.text + "\n----------------------------")
-            print("Чтобы листать дальше, введите 'n'\n"
-                  "Для выбора этой статьи введите 'enter'\n"
-                  "Для выхода из программы введите 'q'\n----------------------------")
-            user_input = input()
-            if user_input == "n":
-                continue
-            elif user_input == "q":
-                browser.quit()
-                sys.exit()
-            else:
-                link = article.find_element(By.TAG_NAME, "a").get_attribute("href")
-                run = False
-                break
-
-
+link = start_search()
 while True:
     try:
         content = get_paragraphs(link)
@@ -138,6 +138,7 @@ while True:
         sys.exit()
     except:
         print("Что-то пошло не так и страница не обработалась")
-        browser.quit()
-        break
+        link = start_search()
+        # browser.quit()
+        # break
 
